@@ -1,6 +1,9 @@
 
-from setuptools import setup
+from setuptools import setup, find_packages
+import sys
+import os
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 import vmimg
 
 def long_desc():
@@ -16,8 +19,10 @@ setup(name="vmimg",
       author="Anatol Belski",
       author_email="anbelski@linux.microsoft.com",
       license="BSD-2-Clause",
-      packages=["vmimg"],
-      scripts=[
-        "bin/vmimg",
-      ],
+      package_dir={"": "src"},
+      packages=find_packages("src"),
+      entry_points={
+      "console_scripts":[
+          "vmimg = vmimg.cli:main",
+      ]},
       zip_safe=False)
