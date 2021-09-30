@@ -6,7 +6,10 @@ import sys
 import vmimg
 
 
-def main(argv):
+def main(argv = []):
+    if len(argv) == 0:
+        argv = sys.argv[1:]
+
     arg_parser_common = argparse.ArgumentParser(add_help=False)
     arg_parser_common.add_argument("-v", "--verbose", action="count",
                                    help="Verbose output.")
@@ -40,6 +43,6 @@ def main(argv):
         return 0
 
 if "__main__" == __name__:
-    ret = main(sys.argv[1:])
+    ret = main()
     sys.exit(ret)
 
