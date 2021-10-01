@@ -32,13 +32,14 @@ def main(argv = []):
             level = logging.DEBUG
     logging.basicConfig(level=level)
 
+    if len(argv) <= 1:
+        arg_parser.print_help()
+        return 0
+
     if "info" == args.cmd:
         from .cmd import info
         return info.handle(args)
     elif "convert" == args.cmd:
         from .cmd import convert
         return convert.handle(args)
-    else:
-        arg_parser.print_help()
-        return 0
 
