@@ -33,16 +33,12 @@ def main(argv = []):
     logging.basicConfig(level=level)
 
     if "info" == args.cmd:
-        from vmimg import info
+        from .cmd import info
         return info.handle(args)
     elif "convert" == args.cmd:
-        from vmimg import convert
+        from .cmd import convert
         return convert.handle(args)
     else:
         arg_parser.print_help()
         return 0
-
-if "__main__" == __name__:
-    ret = main()
-    sys.exit(ret)
 
