@@ -10,19 +10,35 @@ def main(argv = []):
     if len(argv) == 0:
         argv = sys.argv[1:]
 
+    # Common args for every cmd.
     arg_parser_common = argparse.ArgumentParser(add_help=False)
     arg_parser_common.add_argument("-v", "--verbose", action="count",
                                    help="Verbose output.")
-    arg_parser = argparse.ArgumentParser(prog="vmimg", description="VM disk image utils.",
-                                         parents=[arg_parser_common])
+    # Main arg parser.
+    arg_parser = argparse.ArgumentParser(prog="vmimg", description="VM disk image utils.")
     arg_parser.add_argument("-V", "--version", action="version",
                                    version=vmimg.__version__, help="Show version.")
+    # Subcommands.
     arg_parser_subs = arg_parser.add_subparsers(help="Subcommands", dest="cmd")
+    # Image analysis.
     arg_parser_info = arg_parser_subs.add_parser("info", help="Query disk image information.",
                                                  parents=[arg_parser_common])
+    arg_parser_info.add_argument("image", nargs=1, help="Path to the image to be analyzed.")
+    # Image conversion.
     arg_parser_conv = arg_parser_subs.add_parser("convert", help="Convert disk image.",
                                                  parents=[arg_parser_common])
+    arg_parser_conv.add_argument("source", nargs=1)
+    arg_parser_conv.add_argument("target", nargs=1)
+    # Read passed arguments.
     args = arg_parser.parse_args(argv)
+
+    import dumper
+    dumper.dump(args)
+    # Version and help are caught by argparse. Other than that, it's always
+    # like `command subcommand --arg0 --arg1 ....
+    if len(argv) <= 1:
+        arg_parser.print_help()
+        return 0
 
     level = logging.WARN
     if args.verbose:
@@ -31,10 +47,6 @@ def main(argv = []):
         if 2 <= args.verbose:
             level = logging.DEBUG
     logging.basicConfig(level=level)
-
-    if len(argv) <= 1:
-        arg_parser.print_help()
-        return 0
 
     if "info" == args.cmd:
         from .cmd import info
