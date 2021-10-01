@@ -13,7 +13,7 @@ def main(argv = []):
     # Common args for every cmd.
     arg_parser_common = argparse.ArgumentParser(add_help=False)
     arg_parser_common.add_argument("-v", "--verbose", action="count",
-                                   help="Verbose output.")
+                                   help="Verbose output. Pass more than once to increase the level.")
     # Main arg parser.
     arg_parser = argparse.ArgumentParser(prog="vmimg", description="VM disk image utils.")
     arg_parser.add_argument("-V", "--version", action="version",
@@ -27,6 +27,12 @@ def main(argv = []):
     # Image conversion.
     arg_parser_conv = arg_parser_subs.add_parser("convert", help="Convert disk image.",
                                                  parents=[arg_parser_common])
+    arg_parser_conv.add_argument("-r", "--root-part", action="store",
+                                 help="Source root partition number.")
+    arg_parser_conv.add_argument("-b", "--boot-part", action="store",
+                                 help="Source boot partition number.")
+    arg_parser_conv.add_argument("-l", "--lvm-vg", action="store",
+                                 help="Source LVM VG name.")
     arg_parser_conv.add_argument("source", nargs=1)
     arg_parser_conv.add_argument("target", nargs=1)
     # Read passed arguments.
