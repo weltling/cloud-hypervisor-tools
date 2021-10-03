@@ -23,7 +23,9 @@ def main(argv = []):
     # Image analysis.
     arg_parser_info = arg_parser_subs.add_parser("info", help="Query disk image information.",
                                                  parents=[arg_parser_common])
-    arg_parser_info.add_argument("image", nargs=1, help="Path to the image to be analyzed.")
+    arg_parser_info.add_argument("image", action="store", help="Path to the image to be analyzed.")
+    arg_parser_info.add_argument("-p", "--part", action="store_true",
+                                 help="Partition information.")
     # Image conversion.
     arg_parser_conv = arg_parser_subs.add_parser("convert", help="Convert disk image.",
                                                  parents=[arg_parser_common])
@@ -38,8 +40,6 @@ def main(argv = []):
     # Read passed arguments.
     args = arg_parser.parse_args(argv)
 
-    import dumper
-    dumper.dump(args)
     # Version and help are caught by argparse. Other than that, it's always
     # like `command subcommand --arg0 --arg1 ....
     if len(argv) <= 1:
