@@ -27,5 +27,5 @@ setup(name="vmimg",
       ]},
       install_requires=[
           "parse",
-      ]
+      ],
       zip_safe=False)
