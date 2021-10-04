@@ -25,4 +25,7 @@ setup(name="vmimg",
       "console_scripts":[
           "vmimg = vmimg.cli:main",
       ]},
+      install_requires=[
+          "parse",
+      ]
       zip_safe=False)
