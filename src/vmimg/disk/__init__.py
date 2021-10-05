@@ -1,4 +1,5 @@
 
+import os
 import logging
 import subprocess
 from parse import *
@@ -9,6 +10,10 @@ log = logging.getLogger(__name__)
 class Disk():
     
     def __init__(self, dev):
+        dev_fmt = self.get_dev_fmt(dev)
+        if "raw" != dev_fmt:
+            dev = self.dev_cvt(dev, dev_fmt, out_fmt="raw")
+
         cmd = ["sudo", "parted", "-s", dev, "unit", "s", "print"]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -16,7 +21,6 @@ class Disk():
         if proc.returncode:
             log.error(str(err, "utf-8").rstrip())
             return
-
         log.debug(str(out, "utf-8").rstrip())
 
         # Attributes will be assigned in the same order as matched placeholders.
@@ -24,7 +28,7 @@ class Disk():
                 {"pat": "Model: {:>}", "done": False, "attr": ["model"]},
                 {"pat": "Disk {}: {:d}s", "done": False, "attr": ["dev", "sectors"]},
                 {"pat": "Partition Table: {:>}", "done": False, "attr": ["table"]},
-                {"pat": "Sector size (logical/physical): {:d}B/{:d}B", "done": False, "attr": ["sector_size_local", "sector_size_physical"]},
+                {"pat": "Sector size (logical/physical): {:d}B/{:d}B", "done": False, "attr": ["sector_size_logical", "sector_size_physical"]},
         ]
         ret = []
         outl = str(out, "utf-8").split("\n")
@@ -111,3 +115,39 @@ class Disk():
                 n += 1
             self.part[p["num"]] = Part(p)
             k += 1
+
+    def get_dev_fmt(self, dev):
+        cmd = ["sudo", "qemu-img", "info", dev]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            log.error(str(err, "utf-8").rstrip())
+            return None
+        log.debug(str(out, "utf-8").rstrip())
+
+        outl = str(out, "utf-8").split("\n")
+        for l in outl:
+            res = parse("file format: {}", l)
+            if res:
+                return res[0]
+        return None
+
+
+    def dev_cvt(self, dev, dev_fmt, out_dev=None, out_fmt="raw"):
+        if not out_dev:
+            out_dev = os.path.splitext(dev)[0] + ".raw"
+
+        if os.path.exists(out_dev):
+            log.info("Reusing existing '{}'".format(out_dev))
+            return out_dev
+
+        cmd = ["qemu-img", "convert", "-f", dev_fmt, "-O", out_fmt, dev, out_dev]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            log.error(str(err, "utf-8").strip())
+            return None
+        return out_dev
+

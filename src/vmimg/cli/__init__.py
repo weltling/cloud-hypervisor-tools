@@ -24,8 +24,6 @@ def main(argv = []):
     arg_parser_info = arg_parser_subs.add_parser("info", help="Query disk image information.",
                                                  parents=[arg_parser_common])
     arg_parser_info.add_argument("image", action="store", help="Path to the image to be analyzed.")
-    arg_parser_info.add_argument("-p", "--part", action="store_true",
-                                 help="Partition information.")
     # Image conversion.
     arg_parser_conv = arg_parser_subs.add_parser("convert", help="Convert disk image.",
                                                  parents=[arg_parser_common])
@@ -60,4 +58,47 @@ def main(argv = []):
     elif "convert" == args.cmd:
         from .cmd import convert
         return convert.handle(args)
+
+
+# Source https://svn.blender.org/svnroot/bf-blender/trunk/blender/build_files/scons/tools/bcolors.py
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+
+    def disable(self):
+        self.HEADER = ''
+        self.OKBLUE = ''
+        self.OKGREEN = ''
+        self.WARNING = ''
+        self.FAIL = ''
+        self.ENDC = ''
+
+class comm:
+    @staticmethod
+    def warn(s):
+        print(bcolors.WARNING + s + bcolors.ENDC)
+
+    @staticmethod
+    def fail(s):
+        print(bcolors.FAIL + s + bcolors.ENDC)
+
+    @staticmethod
+    def ok(s):
+        print(bcolors.OKGREEN + s + bcolors.ENDC)
+
+    @staticmethod
+    def okb(s):
+        print(bcolors.OKBLUE + s + bcolors.ENDC)
+
+    @staticmethod
+    def head(s):
+        print(bcolors.HEADER + s + bcolors.ENDC)
+
+    @staticmethod
+    def msg(s):
+        print(s)
 
