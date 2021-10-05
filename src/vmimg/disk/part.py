@@ -11,11 +11,6 @@ def pt(l, d):
 
 
 class Part():
-    def __init__(self, num, start, end, size, fs, name, flags):
-        self.num = num
-        self.start = start
-        self.end = end
-        self.size = size
-        self.fs = fs
-        self.name = name
-        self.flags = flags
+    def __init__(self, props):
+        for p in props:
+            setattr(self, p, props[p])

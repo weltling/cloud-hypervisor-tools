@@ -52,20 +52,38 @@ class Disk():
             l = outl[k]
             k += 1
             if l.startswith("Number"):
-                idx.append(l.find("Number"))
-                idx.append(l.find("Start"))
-                idx.append(l.find("End"))
-                idx.append(l.find("Size"))
-                idx.append(l.find("File system"))
-                idx.append(l.find("Name"))
-                idx.append(l.find("Flags"))
+                n = l.find("Number")
+                if n >= 0:
+                    idx.append({"pos": n, "prop": "num"})
+                n = l.find("Start")
+                if n >= 0:
+                    idx.append({"pos": n, "prop": "start"})
+                n = l.find("End")
+                if n >= 0:
+                    idx.append({"pos": n, "prop": "end"})
+                n = l.find("Size")
+                if n >= 0:
+                    idx.append({"pos": n, "prop": "size"})
+                n = l.find("Type")
+                if n >= 0:
+                    idx.append({"pos": n, "prop": "type"})
+                n = l.find("File system")
+                if n >= 0:
+                    idx.append({"pos": n, "prop": "fs"})
+                n = l.find("Name")
+                if n >= 0:
+                    idx.append({"pos": n, "prop": "name"})
+                n = l.find("Flags")
+                if n >= 0:
+                    idx.append({"pos": n, "prop": "flags"})
                 break
+
         # Continue on partition info.
         def pt(l, d):
             u = d + 1
             if len(idx) <= u:
-                return l[idx[d]:].strip()
-            return l[idx[d]:idx[u]].strip()
+                return l[idx[d]["pos"]:].strip()
+            return l[idx[d]["pos"]:idx[u]["pos"]].strip()
 
 
         self.part = {} 
@@ -75,14 +93,21 @@ class Disk():
                 k += 1
                 continue
 
-            p = {"start": int(pt(l, 1)[:-1]), "end": int(pt(l, 2)[:-1]), "size": int(pt(l, 3)[:-1]), "fs": pt(l, 4), "name": pt(l, 5)}
-            s = pt(l, 6)
-            p["flags"] = []
-            if s:
-                p["flags"] = [f.strip() for f in s.split(",")]
-            self.part[int(pt(l, 0))] = Part(int(pt(l, 0)), int(pt(l, 1)[:-1]), int(pt(l, 2)[:-1]), int(pt(l, 3)[:-1]), pt(l, 4), pt(l, 5), [f.strip() for f in pt(l, 6).split(",")])
+            p = {}
+            n = 0
+            while n < len(idx):
+                prop = idx[n]["prop"]
+                val = pt(l, n)
+                if "num" == prop:
+                    p[prop] = int(val)
+                elif "end" == prop or "start" == prop or "size" == prop:
+                    p[prop] = int(val[:-1])
+                elif "flags" == prop:
+                    p[prop] = []
+                    if val:
+                        p[prop] = [f.strip() for f in val.split(",")]
+                else:
+                    p[prop] = val
+                n += 1
+            self.part[p["num"]] = Part(p)
             k += 1
-
-        import dumper
-        dumper.dump(self)
-            
