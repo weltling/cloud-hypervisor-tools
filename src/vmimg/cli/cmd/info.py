@@ -12,6 +12,8 @@ def handle(args):
 def do_info(dev):
     disk = vm_disk.Disk(dev)
     
+    # XXX show bootloader info
+    #     show virtio driver info
     comm.head("Disk info")
     comm.msg("Device: {}".format(disk.dev))
     comm.msg("Model: {}".format(disk.model))

@@ -5,6 +5,7 @@ import logging
 import sys
 import vmimg
 
+# XXX check for dependency tools/libs at runtime
 
 def main(argv = []):
     if len(argv) == 0:
@@ -33,8 +34,10 @@ def main(argv = []):
                                  help="Source boot partition number.")
     arg_parser_conv.add_argument("-l", "--lvm-vg", action="store",
                                  help="Source LVM VG name.")
+    arg_parser_conv.add_argument("-i", "--in-place", action="store_true",
+                                 help="Copy the source image and modify it in-place.")
     arg_parser_conv.add_argument("source", nargs=1)
-    arg_parser_conv.add_argument("target", nargs=1)
+    arg_parser_conv.add_argument("target", nargs="?")
     # Read passed arguments.
     args = arg_parser.parse_args(argv)
 

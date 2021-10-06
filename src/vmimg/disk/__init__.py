@@ -2,25 +2,37 @@
 import os
 import logging
 import subprocess
+import tempfile
 from parse import *
 from vmimg.disk.part import Part
 
 log = logging.getLogger(__name__)
 
+class DiskError(Exception):
+    pass
+
 class Disk():
     
-    def __init__(self, dev):
-        dev_fmt = self.get_dev_fmt(dev)
-        if "raw" != dev_fmt:
-            dev = self.dev_cvt(dev, dev_fmt, out_fmt="raw")
+    # XXX destruct cleanly especially wrt mounts, attached loop devs, etc.
+    def __init__(self, dev, args=None):
+        if isinstance(dev, str):
+            self.__create_from_path(dev)
+        if isinstance(dev, tuple):
+            # (path, image_fmt)
+            self.__create_from_path(dev[0], dev[1])
+
+    def __create_from_path(self, dev, dev_fmt=None):
+        if not dev_fmt:
+            dev_fmt = Disk.get_dev_fmt(dev)
+            if "raw" != dev_fmt:
+                dev = Disk.dev_fmt_cvt(dev, dev_fmt, out_fmt="raw")
 
         cmd = ["sudo", "parted", "-s", dev, "unit", "s", "print"]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
         if proc.returncode:
-            log.error(str(err, "utf-8").rstrip())
-            return
+            raise DiskError(str(err, "utf-8").rstrip())
         log.debug(str(out, "utf-8").rstrip())
 
         # Attributes will be assigned in the same order as matched placeholders.
@@ -116,14 +128,15 @@ class Disk():
             self.part[p["num"]] = Part(p)
             k += 1
 
-    def get_dev_fmt(self, dev):
+
+    @staticmethod
+    def get_dev_fmt(dev):
         cmd = ["sudo", "qemu-img", "info", dev]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
         if proc.returncode:
-            log.error(str(err, "utf-8").rstrip())
-            return None
+            raise DiskError(str(err, "utf-8").rstrip())
         log.debug(str(out, "utf-8").rstrip())
 
         outl = str(out, "utf-8").split("\n")
@@ -134,10 +147,12 @@ class Disk():
         return None
 
 
-    def dev_cvt(self, dev, dev_fmt, out_dev=None, out_fmt="raw"):
+    @staticmethod
+    def dev_fmt_cvt(dev, dev_fmt, out_dev=None, out_fmt="raw"):
         if not out_dev:
             out_dev = os.path.splitext(dev)[0] + ".raw"
 
+        # XXX Implement force condition
         if os.path.exists(out_dev):
             log.info("Reusing existing '{}'".format(out_dev))
             return out_dev
@@ -147,7 +162,70 @@ class Disk():
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
         if proc.returncode:
-            log.error(str(err, "utf-8").strip())
-            return None
+            raise DiskError(str(err, "utf-8").rstrip())
         return out_dev
 
+
+    def attach_lp(self):
+        cmd = ["sudo", "losetup", "-f", "-P", "--show", self.dev]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise DiskError(str(err, "utf-8").rstrip())
+            return
+        self.lp = str(out, "utf-8").rstrip()
+        log.debug("Attached image to '{}'".format(self.lp))
+        return self.lp 
+
+    def detach_lp(self):
+        cmd = ["sudo", "losetup", "-d", self.lp]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise DiskError(str(err, "utf-8").rstrip())
+        log.debug("Detached image from '{}'".format(self.lp))
+        self.lp = None
+
+
+    def make_gpt(self):
+        if "gpt" == self.table:
+            log.warning("Already have GPT")
+            return
+
+        cmd = ["sudo", "sgdisk", "--mbrtogpt", self.lp]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise DiskError(str(out, "utf-8").rstrip())
+        log.debug("Converted from '{}' to '{}'".format(self.table, "gpt"))
+        self.table = "gpt"
+
+
+    # Takes only the boot part
+    def convert_efi_in_place(self, boot_part):
+        # XXX Check if the conversion is really needed. Fe disk is not gpt, no efi part exists, etc. 
+        
+        p = self.part[boot_part]
+
+        self.attach_lp()
+
+        try:
+            td = tempfile.TemporaryDirectory()
+            p.mount(self.lp, td.name)
+            bak_dir = p.backup()
+            p.umount()
+            td.cleanup()
+
+            self.make_gpt()
+
+            self.detach_lp()
+            self.attach_lp()
+
+        except:
+            self.detach_lp()
+            raise
+
+        self.detach_lp()
