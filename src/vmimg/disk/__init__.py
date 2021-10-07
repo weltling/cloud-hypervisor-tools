@@ -273,7 +273,7 @@ class Disk():
 
             # XXX Do part remove/add business, the object is still inconsistent at/after this point
             self.part_del(p.num)
-            p0 = self.part_new(p0_start, p0_end, "fat", [], p0_num)
+            p0 = self.part_new(p0_start, p0_end, "fat", ["type={}".format(0xef00)], p0_num)
             p1 = self.part_new(p1_start, p1_end, p1_fs, p1_flags)
 
             p1_td = tempfile.TemporaryDirectory()

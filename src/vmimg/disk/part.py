@@ -4,6 +4,7 @@ import logging
 import subprocess
 import shutil
 import tempfile
+from parse import *
 
 log = logging.getLogger(__name__)
 
@@ -101,8 +102,16 @@ class Part():
 
     @staticmethod
     def new(disk_dev, num, start, end, fs, flags):
-        # XXX handle flags
-        cmd = ["sudo", "sgdisk", "-n", "{}:{}:{}".format(num, start, end), disk_dev]
+        cmd = ["sudo", "sgdisk", "-n", "{}:{}:{}".format(num, start, end)]
+        # XXX handle more flags
+        for f in flags:
+            if f.startswith("type="):
+                t = int(parse("type={:d}", f)[0])
+                cmd.append("-t")
+                cmd.append("{}:0x{:X}".format(num, t))
+                continue
+
+        cmd.append(disk_dev)
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
