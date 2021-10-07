@@ -240,10 +240,6 @@ class Disk():
         # XXX check if there's enough space after the deletion, so it can be reused for two parts
         p = self.part[boot_part]
 
-        import dumper
-        dumper.dump(self)
-        dumper.dump(p)
-
         self.attach_lp()
 
         try:
@@ -281,8 +277,16 @@ class Disk():
             p1.restore(bak_dir)
             p1.umount()
             p1_td.cleanup()
+            # Remove backup, ignore errors
+            cmd = ["sudo", "rm", "-rf", bak_dir]
+            subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+            log.info(" ".join(cmd))
 
-            dumper.dump(self)
+            # This procedure will only work, if the image already has GRUB2 installed, but teh image creators for some reason chose MBR.
+            # Otherwise it might be still necessary to install GRUB2 from host or attach the image to a VM booted under UEFI.
+
+
+
         except:
             self.detach_lp()
             raise
