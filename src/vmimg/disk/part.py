@@ -20,7 +20,7 @@ class Part():
         for p in props:
             setattr(self, p, props[p])
 
-        self.lp = None
+        self.lo = None
         self.mnt_pt = None
 
 
@@ -31,12 +31,12 @@ class Part():
 
     def mount(self, disk_dev, mnt_pt, rw=False):
         # XXX check if the mount point exists, create if it doesn't
-        self.lp = Part.make_part_dev_path(disk_dev, self.num)
+        self.lo = Part.make_part_dev_path(disk_dev, self.num)
 
         # XXX uid= won't work on FAT and alike, append automatically.
-        #cmd = ["sudo", "mount", "-o", "ro,uid={}".format(os.getuid()), self.lp, mnt_pt]
+        #cmd = ["sudo", "mount", "-o", "ro,uid={}".format(os.getuid()), self.lo, mnt_pt]
         r_opt = "rw" if True == rw else "ro"
-        cmd = ["sudo", "mount", "-o", r_opt, self.lp, mnt_pt]
+        cmd = ["sudo", "mount", "-o", r_opt, self.lo, mnt_pt]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
@@ -48,7 +48,7 @@ class Part():
 
 
     def umount(self):
-        cmd = ["sudo", "umount", self.lp]
+        cmd = ["sudo", "umount", self.lo]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
@@ -56,7 +56,7 @@ class Part():
             raise PartError(str(err, "utf-8").rstrip())
         log.debug(str(out, "utf-8").rstrip())
 
-        self.lp = None
+        self.lo = None
         self.mnt_pt = None
 
 
