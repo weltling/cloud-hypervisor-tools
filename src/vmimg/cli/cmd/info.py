@@ -26,6 +26,8 @@ def do_info(dev):
         comm.fail("Partition table: {}".format(disk.table))
     else:
         comm.ok("Partition table: {}".format(disk.table))
+    # XXX Define CH supported formats and mark fail if the original format is not supported.
+    comm.msg("Image file format: {}".format(vm_disk.Disk.get_dev_fmt(dev)))
     comm.msg("")
 
     comm.head("Partition info")
