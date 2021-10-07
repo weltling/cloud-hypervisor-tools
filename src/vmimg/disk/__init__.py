@@ -165,6 +165,14 @@ class Disk():
             raise DiskError(str(err, "utf-8").rstrip())
         return out_dev
 
+    @staticmethod
+    def dev_resize(dev, sz):
+        cmd = ["qemu-img", "resize", dev, str(sz)]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise DiskError(str(err, "utf-8").rstrip())
 
     def attach_lp(self):
         cmd = ["sudo", "losetup", "-f", "-P", "--show", self.dev]

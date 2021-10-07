@@ -14,6 +14,7 @@ def do_info(dev):
     
     # XXX show bootloader info
     #     show virtio driver info
+    #     warn if mbr and there's no space at the end of the image
     comm.head("Disk info")
     comm.msg("Device: {}".format(disk.dev))
     comm.msg("Model: {}".format(disk.model))

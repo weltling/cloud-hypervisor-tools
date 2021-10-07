@@ -1,4 +1,5 @@
 
+import os
 import logging
 from vmimg.disk import Disk
 from vmimg.cli import comm, bcolors
@@ -10,7 +11,6 @@ def handle(args):
 
 def do_conv(args):
     src_path = args.source[0]
-    tgt_path = args.target
     if args.in_place:
 
         if not args.boot_part:
@@ -19,13 +19,26 @@ def do_conv(args):
 
         dev_fmt = Disk.get_dev_fmt(src_path)
         if "raw" == dev_fmt:
-            # XXX use copy
-            pass
+            tgt_path = os.path.splitext(src_path)[0] + "_copy.raw"
+            dev = Disk.dev_fmt_cvt(src_path, dev_fmt, tgt_path, out_fmt="raw")
         else:
+            tgt_path = args.target
             dev = Disk.dev_fmt_cvt(src_path, dev_fmt, tgt_path, out_fmt="raw")
 
         src = Disk((dev, dev_fmt))
+
+        # XXX For the time being it is still easier to resize image
+        #     rather than going into business of resising partitions.
+        #     Still, some scenariom might need an aligned image size.
+        if "gpt" != src.table:
+            # Assume sector size at least 512B.
+            sz = (src.sectors + 2048) * src.sector_size_logical
+            del src
+            Disk.dev_resize(dev, sz)
+            src = Disk((dev, dev_fmt))
+
         src.convert_efi_in_place(int(args.boot_part))
+
     else:
         #src = Disk(src_path)
         #tgt = vm_disk.Disk(src, args)

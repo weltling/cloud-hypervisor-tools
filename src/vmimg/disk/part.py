@@ -60,9 +60,6 @@ class Part():
     def backup(self):
         td = tempfile.TemporaryDirectory()
 
-        #shutil.rmtree(td.name)
-        #shutil.copytree(self.mnt_pt, td.name)
-
         bak_dir = td.name
         td.cleanup()
             
