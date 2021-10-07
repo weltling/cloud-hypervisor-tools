@@ -42,13 +42,13 @@ def do_info(args):
             if "lo" == k or "mnt_pt" == k:
                 continue
             comm.msg("{}: {}".format(k, v))
-            if "flags" == k and "lvm" in v:
+            if "flags" == k and "lvm" in v and args.extended:
                 lvm = LVM(Part.make_part_dev_path(lo, disk.part[p].num))
-                vg = lvm.scan(3)
-                if not vg:
-                    comm.warn("Partition contains LVM flags but no volume groups have been found")
+                lv = lvm.scan_lv(3)
+                if not lv:
+                    comm.warn("Partition contains LVM flags but no logical volumes have been found")
                     continue
-                comm.msg("VG: {}".format(vg))
+                comm.msg("lv: {}".format(lv))
         comm.msg("")
 
     if args.extended:
