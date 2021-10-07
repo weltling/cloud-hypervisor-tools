@@ -108,7 +108,7 @@ class Part():
             if f.startswith("type="):
                 t = int(parse("type={:d}", f)[0])
                 cmd.append("-t")
-                cmd.append("{}:0x{:X}".format(num, t))
+                cmd.append("{}:0x{:x}".format(num, t))
                 continue
 
         cmd.append(disk_dev)
