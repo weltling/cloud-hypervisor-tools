@@ -229,6 +229,8 @@ class Disk():
                 num += 1
         self.part[num] = Part.new(self.lp, num, start, end, fs, flags)
 
+        return self.part[num]
+
 
     # Takes only the boot part
     def convert_efi_in_place(self, boot_part):
@@ -271,8 +273,14 @@ class Disk():
 
             # XXX Do part remove/add business, the object is still inconsistent at/after this point
             self.part_del(p.num)
-            self.part_new(p0_start, p0_end, "fat", [], p0_num)
-            self.part_new(p1_start, p1_end, p1_fs, p1_flags)
+            p0 = self.part_new(p0_start, p0_end, "fat", [], p0_num)
+            p1 = self.part_new(p1_start, p1_end, p1_fs, p1_flags)
+
+            p1_td = tempfile.TemporaryDirectory()
+            p1.mount(self.lp, p1_td.name, True)
+            p1.restore(bak_dir)
+            p1.umount()
+            p1_td.cleanup()
 
             dumper.dump(self)
         except:

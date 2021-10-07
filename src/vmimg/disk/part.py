@@ -19,20 +19,23 @@ class Part():
         for p in props:
             setattr(self, p, props[p])
 
-    @staticmethod
-    def make_dev_path(loop, num):
-        # XXX check if the path is already a part dev path
-        return "{}p{}".format(loop, num)
+        self.lp = None
+        self.mnt_pt = None
 
-    def mount(self, loop, mnt_pt):
+
+    @staticmethod
+    def make_part_dev_path(disk_dev, num):
+        # XXX check if the path is already a part dev path
+        return "{}p{}".format(disk_dev, num)
+
+    def mount(self, disk_dev, mnt_pt, rw=False):
         # XXX check if the mount point exists, create if it doesn't
-        self.lp = Part.make_dev_path(loop, self.num)
+        self.lp = Part.make_part_dev_path(disk_dev, self.num)
 
         # XXX uid= won't work on FAT and alike, append automatically.
-        # XXX Introduce arguments to mount RW and more for various situations.
         #cmd = ["sudo", "mount", "-o", "ro,uid={}".format(os.getuid()), self.lp, mnt_pt]
-        # Mount RO for the time being!
-        cmd = ["sudo", "mount", "-o", "ro", self.lp, mnt_pt]
+        r_opt = "rw" if True == rw else "ro"
+        cmd = ["sudo", "mount", "-o", r_opt, self.lp, mnt_pt]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
@@ -46,7 +49,6 @@ class Part():
     def umount(self):
         cmd = ["sudo", "umount", self.lp]
         log.info(" ".join(cmd))
-
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
         if proc.returncode:
@@ -72,6 +74,18 @@ class Part():
         log.debug(str(out, "utf-8").rstrip())
 
         return bak_dir
+
+    def restore(self, bak_dir):
+        if not self.mnt_pt:
+            raise PartError("Partitinion is not mounted")
+
+        cmd = "sudo cp -a {}/* {}".format(bak_dir, self.mnt_pt)
+        log.info(cmd)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise PartError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").rstrip())
 
 
     @staticmethod
@@ -103,7 +117,7 @@ class Part():
 
     @staticmethod
     def mkfs(disk_dev, num, fs):
-        cmd = ["sudo", "mkfs", "-t", fs, Part.make_dev_path(disk_dev, num)]
+        cmd = ["sudo", "mkfs", "-t", fs, Part.make_part_dev_path(disk_dev, num)]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
