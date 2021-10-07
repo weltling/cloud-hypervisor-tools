@@ -174,7 +174,7 @@ class Disk():
         if proc.returncode:
             raise DiskError(str(err, "utf-8").rstrip())
 
-    def attach_lp(self):
+    def attach_lo(self):
         cmd = ["sudo", "losetup", "-f", "-P", "--show", self.dev]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -182,19 +182,19 @@ class Disk():
         if proc.returncode:
             raise DiskError(str(err, "utf-8").rstrip())
             return
-        self.lp = str(out, "utf-8").rstrip()
-        log.debug("Attached image to '{}'".format(self.lp))
-        return self.lp 
+        self.lo = str(out, "utf-8").rstrip()
+        log.debug("Attached image to '{}'".format(self.lo))
+        return self.lo 
 
-    def detach_lp(self):
-        cmd = ["sudo", "losetup", "-d", self.lp]
+    def detach_lo(self):
+        cmd = ["sudo", "losetup", "-d", self.lo]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
         if proc.returncode:
             raise DiskError(str(err, "utf-8").rstrip())
-        log.debug("Detached image from '{}'".format(self.lp))
-        self.lp = None
+        log.debug("Detached image from '{}'".format(self.lo))
+        self.lo = None
 
 
     def make_gpt(self):
@@ -202,7 +202,7 @@ class Disk():
             log.warning("Already have GPT")
             return
 
-        cmd = ["sudo", "sgdisk", "--mbrtogpt", self.lp]
+        cmd = ["sudo", "sgdisk", "--mbrtogpt", self.lo]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
@@ -213,21 +213,21 @@ class Disk():
 
 
     def part_del(self, num):
-        if not self.lp:
+        if not self.lo:
             raise DiskError("Disk not attached to any loop device")
-        Part.delete(self.lp, num)
+        Part.delete(self.lo, num)
         del self.part[num]
 
 
     def part_new(self, start, end, fs, flags = {}, num=-1):
-        if not self.lp:
+        if not self.lo:
             raise DiskError("Disk not attached to any loop device")
 
         if num < 1:
             num = 1
             while num in self.part.keys():
                 num += 1
-        self.part[num] = Part.new(self.lp, num, start, end, fs, flags)
+        self.part[num] = Part.new(self.lo, num, start, end, fs, flags)
 
         return self.part[num]
 
@@ -240,19 +240,19 @@ class Disk():
         # XXX check if there's enough space after the deletion, so it can be reused for two parts
         p = self.part[boot_part]
 
-        self.attach_lp()
+        self.attach_lo()
 
         try:
             td = tempfile.TemporaryDirectory()
-            p.mount(self.lp, td.name)
+            p.mount(self.lo, td.name)
             bak_dir = p.backup()
             p.umount()
             td.cleanup()
 
             self.make_gpt()
 
-            self.detach_lp()
-            self.attach_lp()
+            self.detach_lo()
+            self.attach_lo()
 
             # XXX After the deletion, the data in the object might be inconsistent.
             # EFI part new
@@ -273,7 +273,7 @@ class Disk():
             p1 = self.part_new(p1_start, p1_end, p1_fs, p1_flags)
 
             p1_td = tempfile.TemporaryDirectory()
-            p1.mount(self.lp, p1_td.name, True)
+            p1.mount(self.lo, p1_td.name, True)
             p1.restore(bak_dir)
             p1.umount()
             p1_td.cleanup()
@@ -288,7 +288,7 @@ class Disk():
 
 
         except:
-            self.detach_lp()
+            self.detach_lo()
             raise
 
-        self.detach_lp()
+        self.detach_lo()
