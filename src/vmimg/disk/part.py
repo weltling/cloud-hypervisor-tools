@@ -69,5 +69,45 @@ class Part():
         out, err = proc.communicate()
         if proc.returncode:
             raise PartError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").rstrip())
 
         return bak_dir
+
+
+    @staticmethod
+    def delete(disk_dev, num):
+        cmd = ["sudo", "sgdisk", "-d", str(num), disk_dev]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise PartError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").rstrip())
+
+
+    @staticmethod
+    def new(disk_dev, num, start, end, fs, flags):
+        # XXX handle flags
+        cmd = ["sudo", "sgdisk", "-n", "{}:{}:{}".format(num, start, end), disk_dev]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise PartError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").rstrip())
+
+        Part.mkfs(disk_dev, num, fs)
+
+        return Part({"num": num, "start": start, "end": end, "fs": fs, "flags": flags})
+
+
+    @staticmethod
+    def mkfs(disk_dev, num, fs):
+        cmd = ["sudo", "mkfs", "-t", fs, Part.make_dev_path(disk_dev, num)]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise PartError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").rstrip())
+

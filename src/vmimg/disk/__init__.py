@@ -212,11 +212,35 @@ class Disk():
         self.table = "gpt"
 
 
+    def part_del(self, num):
+        if not self.lp:
+            raise DiskError("Disk not attached to any loop device")
+        Part.delete(self.lp, num)
+        del self.part[num]
+
+
+    def part_new(self, start, end, fs, flags = {}, num=-1):
+        if not self.lp:
+            raise DiskError("Disk not attached to any loop device")
+
+        if num < 1:
+            num = 1
+            while num in self.part.keys():
+                num += 1
+        self.part[num] = Part.new(self.lp, num, start, end, fs, flags)
+
+
     # Takes only the boot part
     def convert_efi_in_place(self, boot_part):
         # XXX Check if the conversion is really needed. Fe disk is not gpt, no efi part exists, etc. 
-        
+
+        # XXX check if part exists and bail out cleanly
+        # XXX check if there's enough space after the deletion, so it can be reused for two parts
         p = self.part[boot_part]
+
+        import dumper
+        dumper.dump(self)
+        dumper.dump(p)
 
         self.attach_lp()
 
@@ -232,6 +256,25 @@ class Disk():
             self.detach_lp()
             self.attach_lp()
 
+            # XXX After the deletion, the data in the object might be inconsistent.
+            # EFI part new
+            p0_num = p.num
+            p0_start = p.start
+            p0_end = int((p.end - p.start)/2)
+            p0_fs = "fat32"
+            # Boot part, shrinked old one
+            # num determined automatically
+            p1_start = p0_end + 1
+            p1_end = p.end
+            p1_fs = p.fs
+            p1_flags = p.flags
+
+            # XXX Do part remove/add business, the object is still inconsistent at/after this point
+            self.part_del(p.num)
+            self.part_new(p0_start, p0_end, "fat", [], p0_num)
+            self.part_new(p1_start, p1_end, p1_fs, p1_flags)
+
+            dumper.dump(self)
         except:
             self.detach_lp()
             raise
