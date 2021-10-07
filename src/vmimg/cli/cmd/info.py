@@ -1,16 +1,21 @@
 
 import logging
-from vmimg import disk as vm_disk
+from vmimg.disk import Disk
+from vmimg.disk.lvm import LVM
+from vmimg.disk.part import Part
 from vmimg.cli import comm, bcolors
 
 log = logging.getLogger(__name__)
 
 def handle(args):
-    do_info(args.image)
+    do_info(args)
     return 0
 
-def do_info(dev):
-    disk = vm_disk.Disk(dev)
+def do_info(args):
+    dev = args.image
+    disk = Disk(dev)
+    if args.extended:
+        lo = disk.attach_lo()
     
     # XXX show bootloader info
     #     show virtio driver info
@@ -27,12 +32,24 @@ def do_info(dev):
     else:
         comm.ok("Partition table: {}".format(disk.table))
     # XXX Define CH supported formats and mark fail if the original format is not supported.
-    comm.msg("Image file format: {}".format(vm_disk.Disk.get_dev_fmt(dev)))
+    comm.msg("Image file format: {}".format(Disk.get_dev_fmt(dev)))
     comm.msg("")
+
 
     comm.head("Partition info")
     for p in disk.part:
         for k, v in disk.part[p].__dict__.items():
+            if "lo" == k or "mnt_pt" == k:
+                continue
             comm.msg("{}: {}".format(k, v))
+            if "flags" == k and "lvm" in v:
+                lvm = LVM(Part.make_part_dev_path(lo, disk.part[p].num))
+                vg = lvm.scan(3)
+                if not vg:
+                    comm.warn("Partition contains LVM flags but no volume groups have been found")
+                    continue
+                comm.msg("VG: {}".format(vg))
         comm.msg("")
 
+    if args.extended:
+        disk.detach_lo()

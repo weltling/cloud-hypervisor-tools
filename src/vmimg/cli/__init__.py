@@ -22,8 +22,10 @@ def main(argv = []):
     # Subcommands.
     arg_parser_subs = arg_parser.add_subparsers(help="Subcommands", dest="cmd")
     # Image analysis.
-    arg_parser_info = arg_parser_subs.add_parser("info", help="Query disk image information.",
+    arg_parser_info = arg_parser_subs.add_parser("info", help="Query disk image information. By default, a concise information is delivered without the image to be mounted.",
                                                  parents=[arg_parser_common])
+    arg_parser_info.add_argument("-e", "--extended", action="store_true",
+                                 help="Extended information, requires mounting the device and researching the contents.")
     arg_parser_info.add_argument("image", action="store", help="Path to the image to be analyzed.")
     # Image conversion.
     arg_parser_conv = arg_parser_subs.add_parser("convert", help="Convert disk image.",
