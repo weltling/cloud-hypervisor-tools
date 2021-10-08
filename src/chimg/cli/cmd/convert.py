@@ -1,8 +1,8 @@
 
 import os
 import logging
-from vmimg.disk import Disk
-from vmimg.cli import comm, bcolors
+from chimg.disk import Disk
+from chimg.cli import comm, bcolors
 
 log = logging.getLogger(__name__)
 

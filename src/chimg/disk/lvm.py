@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 import time
 from parse import *
-from vmimg.disk.part import Part
+from chimg.disk.part import Part
 
 log = logging.getLogger(__name__)
 

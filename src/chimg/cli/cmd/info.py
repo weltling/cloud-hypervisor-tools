@@ -1,9 +1,9 @@
 
 import logging
-from vmimg.disk import Disk
-from vmimg.disk.lvm import LVM
-from vmimg.disk.part import Part
-from vmimg.cli import comm, bcolors
+from chimg.disk import Disk
+from chimg.disk.lvm import LVM
+from chimg.disk.part import Part
+from chimg.cli import comm, bcolors
 
 log = logging.getLogger(__name__)
 

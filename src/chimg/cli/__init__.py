@@ -3,7 +3,7 @@
 import argparse
 import logging
 import sys
-import vmimg
+import chimg
 
 # XXX check for dependency tools/libs at runtime
 
@@ -16,9 +16,9 @@ def main(argv = []):
     arg_parser_common.add_argument("-v", "--verbose", action="count",
                                    help="Verbose output. Pass more than once to increase the level.")
     # Main arg parser.
-    arg_parser = argparse.ArgumentParser(prog="vmimg", description="VM disk image utils.")
+    arg_parser = argparse.ArgumentParser(prog="chimg", description="VM disk image utils.")
     arg_parser.add_argument("-V", "--version", action="version",
-                                   version=vmimg.__version__, help="Show version.")
+                                   version=chimg.__version__, help="Show version.")
     # Subcommands.
     arg_parser_subs = arg_parser.add_subparsers(help="Subcommands", dest="cmd")
     # Image analysis.
