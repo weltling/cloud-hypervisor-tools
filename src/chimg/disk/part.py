@@ -34,6 +34,11 @@ class Part():
         self.mnt_pt = None
 
 
+    def __del__(self):
+        if self.mnt_pt:
+            self.umount()
+
+
     @staticmethod
     def make_part_dev_path(disk_dev, num):
         # XXX check if the path is already a part dev path
@@ -41,7 +46,8 @@ class Part():
 
     def mount(self, disk_dev, mnt_pt, rw=False):
         # XXX check if the mount point exists, create if it doesn't
-        self.lo = Part.make_part_dev_path(disk_dev, self.num)
+        if not self.lo:
+            self.lo = Part.make_part_dev_path(disk_dev, self.num)
 
         # XXX uid= won't work on FAT and alike, append automatically.
         #cmd = ["sudo", "mount", "-o", "ro,uid={}".format(os.getuid()), self.lo, mnt_pt]
@@ -66,7 +72,6 @@ class Part():
             raise PartError(str(err, "utf-8").rstrip())
         log.debug(str(out, "utf-8").rstrip())
 
-        self.lo = None
         self.mnt_pt = None
 
 
@@ -111,7 +116,7 @@ class Part():
 
 
     @staticmethod
-    def new(disk_dev, num, start, end, fs, flags):
+    def new(disk, num, start, end, fs, flags):
         cmd = ["sudo", "sgdisk", "-n", "{}:{}:{}".format(num, start, end)]
         # XXX handle more flags
         for f in flags:
@@ -121,7 +126,7 @@ class Part():
                 cmd.append("{}:0x{:x}".format(num, t))
                 continue
 
-        cmd.append(disk_dev)
+        cmd.append(disk.lo)
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
@@ -129,7 +134,7 @@ class Part():
             raise PartError(str(err, "utf-8").rstrip())
         log.debug(str(out, "utf-8").rstrip())
 
-        Part.mkfs(disk_dev, num, fs)
+        Part.mkfs(disk.lo, num, fs)
 
         return Part({"num": num, "start": start, "end": end, "fs": fs, "flags": flags})
 

@@ -23,6 +23,8 @@ class Disk():
             self.__create_from_path(dev[0], dev[1], attach)
 
     def __del__(self):
+        for p in self.part:
+            del p
         if self.lo:
             self.detach_lo()
 
@@ -182,6 +184,8 @@ class Disk():
             raise DiskError(str(err, "utf-8").rstrip())
 
     def attach_lo(self):
+        if self.lo:
+            return self.lo
         cmd = ["sudo", "losetup", "-f", "-P", "--show", self.dev]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -194,6 +198,8 @@ class Disk():
         return self.lo 
 
     def detach_lo(self):
+        if not self.lo:
+            return
         cmd = ["sudo", "losetup", "-d", self.lo]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -234,7 +240,7 @@ class Disk():
             num = 1
             while num in self.part.keys():
                 num += 1
-        self.part[num] = Part.new(self.lo, num, start, end, fs, flags)
+        self.part[num] = Part.new(self, num, start, end, fs, flags)
 
         return self.part[num]
 
@@ -279,20 +285,36 @@ class Disk():
             p0 = self.part_new(p0_start, p0_end, "fat", ["type={}".format(0xef00)], p0_num)
             p1 = self.part_new(p1_start, p1_end, p1_fs, p1_flags)
 
+            # Prepare boot and efi parts
             p1_td = tempfile.TemporaryDirectory()
             p1.mount(self.lo, p1_td.name, True)
+
+            p0_td = tempfile.TemporaryDirectory()
+            p0.mount(self.lo, p0_td.name, True)
+
+            # Move things around
             p1.restore(bak_dir)
+            # XXX This part is very vague, will probably only fork for RHEL family
+            # XXX pack into a method
+            if os.path.isdir(os.path.join(p1.mnt_pt, "efi")):
+                cmd = "sudo mv {}/* {}".format(os.path.join(p1.mnt_pt, "efi"), p0.mnt_pt)
+                log.info(cmd)
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                out, err = proc.communicate()
+                if proc.returncode:
+                    raise PartError(str(err, "utf-8").rstrip())
+                log.debug(str(out, "utf-8").rstrip())
+
+            # Tear down boot and efi parts
+            p0.umount()
+            p0_td.cleanup()
+
             p1.umount()
             p1_td.cleanup()
             # Remove backup, ignore errors
             cmd = ["sudo", "rm", "-rf", bak_dir]
             subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
             log.info(" ".join(cmd))
-
-            # This procedure will only work, if the image already has GRUB2 installed, but teh image creators for some reason chose MBR.
-            # Otherwise it might be still necessary to install GRUB2 from host or attach the image to a VM booted under UEFI.
-
-
 
         except:
             self.detach_lo()

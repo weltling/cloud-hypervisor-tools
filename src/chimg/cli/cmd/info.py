@@ -33,9 +33,6 @@ def do_info(args):
     comm.msg("Image file format: {}".format(Disk.get_dev_fmt(dev)))
     comm.msg("")
 
-    import dumper
-    dumper.dump(disk)
-
     comm.head("Partition info")
     for p in disk.part:
         for k, v in disk.part[p].__dict__.items():
@@ -49,5 +46,4 @@ def do_info(args):
                     comm.warn("Partition contains LVM flags but no logical volumes have been found")
                     continue
                 comm.msg("lv: {}".format(lv))
-            #dumper.dump(v)
         comm.msg("")
