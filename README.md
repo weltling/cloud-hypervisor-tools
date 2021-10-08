@@ -1,3 +1,4 @@
-# vmimg
-VM disk image utils
+# cloud-hypervisor-tools
+## chimg
+Cloud Hypervisor tools to manage VM image compatibility.
 
