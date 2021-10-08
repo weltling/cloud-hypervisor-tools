@@ -34,6 +34,7 @@ class LVM():
                 self.vg = res[0]
                 return self.vg
 
+            log.debug("Couldn't read VG info, will retry in {} seconds".format(k))
             time.sleep(k)
             k += 1
 
@@ -61,6 +62,7 @@ class LVM():
                         self.lv.append(lv)
                 return self.lv
 
+            log.debug("Couldn't read LV info, will retry {} seconds".format(k))
             time.sleep(k)
             k += 1
 
