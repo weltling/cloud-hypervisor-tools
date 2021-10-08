@@ -12,10 +12,10 @@ def long_desc():
 
 setup(name="cloud-hypervisor-tools",
       version=chimg.__version__,
-      description="VM disk image utils",
+      description="Cloud Hypervisor Tools",
       long_description=long_desc(),
       long_description_content_type="text/markdown",
-      url="https://github.com/weltling/chimg",
+      url="https://github.com/weltling/cloud-hypervisor-tools",
       author="Anatol Belski",
       author_email="anbelski@linux.microsoft.com",
       license="BSD-2-Clause",
