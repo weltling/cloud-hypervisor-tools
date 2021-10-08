@@ -16,11 +16,21 @@ class PartError(Exception):
 class Part():
 
     # XXX Currently only instantiated in Disk ctr only, make possible to instantiate standalone.
-    def __init__(self, props):
+    def __init__(self, props, disk=None):
         for p in props:
             setattr(self, p, props[p])
 
-        self.lo = None
+        if disk:
+            if not disk.lo:
+                disk.attach_lo()
+            self.lo = Part.make_part_dev_path(disk.lo, self.num)
+            self.uuid = Part.blkid(disk.lo, self.num, "UUID")
+            self.partuuid = Part.blkid(disk.lo, self.num, "PARTUUID")
+        else:
+            self.lo = None
+            self.uuid = None
+            self.partuuid = None
+
         self.mnt_pt = None
 
 
@@ -122,6 +132,21 @@ class Part():
         Part.mkfs(disk_dev, num, fs)
 
         return Part({"num": num, "start": start, "end": end, "fs": fs, "flags": flags})
+
+
+    @staticmethod
+    def blkid(disk_dev, num, tag):
+        cmd = ["sudo", "blkid", "-s", tag, Part.make_part_dev_path(disk_dev, num)]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise PartError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").rstrip())
+        res = parse("{:>}{}=\"{}\"", str(out, "utf-8").rstrip())
+        if res:
+            return res[2]
+        return None
 
 
     @staticmethod

@@ -13,15 +13,20 @@ class DiskError(Exception):
 
 class Disk():
     
-    # XXX destruct cleanly especially wrt mounts, attached loop devs, etc.
-    def __init__(self, dev, args=None):
+    def __init__(self, dev, attach=False):
+        self.lo = None
+        self.part = {} 
         if isinstance(dev, str):
-            self.__create_from_path(dev)
+            self.__create_from_path(dev, attach=attach)
         if isinstance(dev, tuple):
             # (path, image_fmt)
-            self.__create_from_path(dev[0], dev[1])
+            self.__create_from_path(dev[0], dev[1], attach)
 
-    def __create_from_path(self, dev, dev_fmt=None):
+    def __del__(self):
+        if self.lo:
+            self.detach_lo()
+
+    def __create_from_path(self, dev, dev_fmt=None, attach=False):
         if not dev_fmt:
             dev_fmt = Disk.get_dev_fmt(dev)
             if "raw" != dev_fmt:
@@ -94,6 +99,9 @@ class Disk():
                     idx.append({"pos": n, "prop": "flags"})
                 break
 
+        if attach:
+            self.attach_lo()
+
         # Continue on partition info.
         def pt(l, d):
             u = d + 1
@@ -102,7 +110,6 @@ class Disk():
             return l[idx[d]["pos"]:idx[u]["pos"]].strip()
 
 
-        self.part = {} 
         while k < outl_len:
             l = outl[k]
             if len(l) <= 0:
@@ -125,7 +132,7 @@ class Disk():
                 else:
                     p[prop] = val
                 n += 1
-            self.part[p["num"]] = Part(p)
+            self.part[p["num"]] = Part(p, self)
             k += 1
 
 

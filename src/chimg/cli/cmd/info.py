@@ -13,9 +13,7 @@ def handle(args):
 
 def do_info(args):
     dev = args.image
-    disk = Disk(dev)
-    if args.extended:
-        lo = disk.attach_lo()
+    disk = Disk(dev, True)
     
     # XXX show bootloader info
     #     show virtio driver info
@@ -35,6 +33,8 @@ def do_info(args):
     comm.msg("Image file format: {}".format(Disk.get_dev_fmt(dev)))
     comm.msg("")
 
+    import dumper
+    dumper.dump(disk)
 
     comm.head("Partition info")
     for p in disk.part:
@@ -42,14 +42,12 @@ def do_info(args):
             if "lo" == k or "mnt_pt" == k:
                 continue
             comm.msg("{}: {}".format(k, v))
-            if "flags" == k and "lvm" in v and args.extended:
-                lvm = LVM(Part.make_part_dev_path(lo, disk.part[p].num))
+            if "flags" == k and "lvm" in v:
+                lvm = LVM(Part.make_part_dev_path(disk.lo, disk.part[p].num))
                 lv = lvm.scan_lv(3)
                 if not lv:
                     comm.warn("Partition contains LVM flags but no logical volumes have been found")
                     continue
                 comm.msg("lv: {}".format(lv))
+            #dumper.dump(v)
         comm.msg("")
-
-    if args.extended:
-        disk.detach_lo()
