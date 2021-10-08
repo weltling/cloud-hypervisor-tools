@@ -12,20 +12,34 @@ log = logging.getLogger(__name__)
 class LvmError(Exception):
     pass
 
+
+# XXX Split into VG and LV classes to handle things correctly
+
 class LVM():
 
-    def __init__(self, lo):
-        self.lo = lo
+    def __init__(self, part_lo):
+        self.part_lo = part_lo
+        self.lo = None
+        self.lv = None
+        self.vg = None
+        self.mnt_pt = None
+
+
+    def __del__(self):
+        if self.mnt_pt:
+            self.umount()
+        self.deactivate()
+
 
     def scan_vg(self, tmo=1):
         k = 0
         while k < tmo:
-            cmd = ["sudo", "vgscan", "--devices", self.lo]
+            cmd = ["sudo", "vgscan", "--devices", self.part_lo]
             log.info(" ".join(cmd))
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = proc.communicate()
             if proc.returncode:
-                raise PartError(str(err, "utf-8").rstrip())
+                raise LvmError(str(err, "utf-8").rstrip())
             log.debug(str(out, "utf-8").strip())
 
             res = parse("Found volume group \"{}\"{:>}", str(out, "utf-8").strip())
@@ -43,12 +57,12 @@ class LVM():
     def scan_lv(self, tmo=1):
         k = 0
         while k < tmo:
-            cmd = ["sudo", "lvs", "--devices", self.lo, "--separator", ":", "--noheadings"]
+            cmd = ["sudo", "lvs", "--devices", self.part_lo, "--separator", ":", "--noheadings"]
             log.info(" ".join(cmd))
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = proc.communicate()
             if proc.returncode:
-                raise PartError(str(err, "utf-8").rstrip())
+                raise LvmError(str(err, "utf-8").rstrip())
             log.debug(str(out, "utf-8").strip())
 
 
@@ -70,7 +84,57 @@ class LVM():
 
 
     def activate(self):
-        #td = tempfile.TemporaryDirectory()
-        pass
+        if not self.vg:
+            return
+        cmd = ["sudo", "vgchange", "-ay", self.vg]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise LvmError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").strip())
 
         
+    def deactivate(self):
+        if not self.vg:
+            return
+        cmd = ["sudo", "vgchange", "-an", self.vg]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise LvmError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").strip())
+        self.vg = None
+
+
+    def mount(self,  mnt_pt, rw=False):
+        # XXX check if the mount point exists, create if it doesn't
+        if not self.lo:
+            self.lo = Part.make_part_dev_path(disk_dev, self.num)
+
+        # XXX uid= won't work on FAT and alike, append automatically.
+        #cmd = ["sudo", "mount", "-o", "ro,uid={}".format(os.getuid()), self.lo, mnt_pt]
+        r_opt = "rw" if True == rw else "ro"
+        cmd = ["sudo", "mount", "-o", r_opt, self.lo, mnt_pt]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise LvmError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").rstrip())
+
+        self.mnt_pt = mnt_pt
+
+
+    def umount(self):
+        cmd = ["sudo", "umount", self.lo]
+        log.info(" ".join(cmd))
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise LvmError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").rstrip())
+
+        self.mnt_pt = None
+

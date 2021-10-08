@@ -105,3 +105,6 @@ class comm:
     def msg(s):
         print(s)
 
+class CliError(Exception):
+    pass
+

@@ -3,7 +3,7 @@ import logging
 from chimg.disk import Disk
 from chimg.disk.lvm import LVM
 from chimg.disk.part import Part
-from chimg.cli import comm, bcolors
+from chimg.cli import comm, bcolors, CliError
 
 log = logging.getLogger(__name__)
 
@@ -41,9 +41,14 @@ def do_info(args):
             comm.msg("{}: {}".format(k, v))
             if "flags" == k and "lvm" in v:
                 lvm = LVM(Part.make_part_dev_path(disk.lo, disk.part[p].num))
+                vg = lvm.scan_vg(3)
+                if not vg:
+                    comm.warn("Partition contains LVM flags but no volume groups have been found")
+                else:
+                    comm.msg("vg: {}".format(vg))
                 lv = lvm.scan_lv(3)
                 if not lv:
                     comm.warn("Partition contains LVM flags but no logical volumes have been found")
-                    continue
-                comm.msg("lv: {}".format(lv))
+                else:
+                    comm.msg("lv: {}".format(lv))
         comm.msg("")

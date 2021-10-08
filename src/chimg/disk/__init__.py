@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 from parse import *
 from chimg.disk.part import Part
+from chimg.disk.lvm import LVM
 
 log = logging.getLogger(__name__)
 
@@ -246,20 +247,46 @@ class Disk():
 
 
     # Takes only the boot part
-    def convert_efi_in_place(self, boot_part):
+    def convert_efi_in_place(self, boot_part, root_part):
         # XXX Check if the conversion is really needed. Fe disk is not gpt, no efi part exists, etc. 
 
         # XXX check if part exists and bail out cleanly
         # XXX check if there's enough space after the deletion, so it can be reused for two parts
-        p = self.part[boot_part]
+        bp = self.part[boot_part]
+        lvm = None
+        rp = None
+        if isinstance(root_part, int):
+            rp = self.part[root_part]
+        elif isinstance(root_part, str):
+            # Must be on LVM
+            # XXX Pack LVM part search into a method
+            for p in self.part:
+                got_it = False
+                for k, v in self.part[p].__dict__.items():
+                    if "flags" == k and "lvm" in v:
+                #for k, v in disk.part[p].__dict__.items():
+                #    if "flags" == k and "lvm" in v:
+                #        lvm = LVM(Part.make_part_dev_path(self.lo, disk.part[p].num))
+                        lvm = LVM(Part.make_part_dev_path(self.lo, self.part[p].num))
+                        vg = lvm.scan_vg(3)
+                        lv = lvm.scan_lv(3)
+                        if root_part in lv:
+                            lvm.lo = "/dev/mapper/" + root_part
+                            lvm.activate()
+                            got_it = True
+                        break
+                if got_it:
+                    break
+        else:
+            raise DiskError("Can't interpret '{}' as root partition".format(root_part))
 
         self.attach_lo()
 
         try:
             td = tempfile.TemporaryDirectory()
-            p.mount(self.lo, td.name)
-            bak_dir = p.backup()
-            p.umount()
+            bp.mount(self.lo, td.name)
+            bak_dir = bp.backup()
+            bp.umount()
             td.cleanup()
 
             self.make_gpt()
@@ -267,21 +294,25 @@ class Disk():
             self.detach_lo()
             self.attach_lo()
 
+            old_uuid = bp.uuid
+            old_partuuid = bp.partuuid
+
+
             # XXX After the deletion, the data in the object might be inconsistent.
             # EFI part new
-            p0_num = p.num
-            p0_start = p.start
-            p0_end = int((p.end - p.start)/2)
+            p0_num = bp.num
+            p0_start = bp.start
+            p0_end = int((bp.end - bp.start)/2)
             p0_fs = "fat32"
             # Boot part, shrinked old one
             # num determined automatically
             p1_start = p0_end + 1
-            p1_end = p.end
-            p1_fs = p.fs
-            p1_flags = p.flags
+            p1_end = bp.end
+            p1_fs = bp.fs
+            p1_flags = bp.flags
 
             # XXX Do part remove/add business, the object is still inconsistent at/after this point
-            self.part_del(p.num)
+            self.part_del(bp.num)
             p0 = self.part_new(p0_start, p0_end, "fat", ["type={}".format(0xef00)], p0_num)
             p1 = self.part_new(p1_start, p1_end, p1_fs, p1_flags)
 
@@ -302,7 +333,7 @@ class Disk():
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 out, err = proc.communicate()
                 if proc.returncode:
-                    raise PartError(str(err, "utf-8").rstrip())
+                    raise DiskError(str(err, "utf-8").rstrip())
                 log.debug(str(out, "utf-8").rstrip())
 
             # Tear down boot and efi parts
@@ -315,6 +346,49 @@ class Disk():
             cmd = ["sudo", "rm", "-rf", bak_dir]
             subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
             log.info(" ".join(cmd))
+
+
+            # Fix fstab
+            rp_td = tempfile.TemporaryDirectory()
+            if rp:
+                rp.mount(self.lo, rp_td.name, True) 
+            elif lvm:
+                lvm.mount(rp_td.name, True) 
+
+            fn = os.path.join(rp_td.name, "etc", "fstab")
+            with open(fn, "r") as f:
+                out = f.read()
+                f.close()
+            log.debug(out)
+
+            out = out.replace(old_uuid, p1.uuid)
+            out = out.replace(old_partuuid, p1.partuuid)
+            tfn = tempfile.NamedTemporaryFile()
+            with open(tfn.name, "w") as f:
+                f.write(out)
+
+            cmd = "sudo cp {} {}".format(tfn.name, fn)
+            log.info(cmd)
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            out, err = proc.communicate()
+            if proc.returncode:
+                raise DiskError(str(err, "utf-8").rstrip())
+            log.debug(str(out, "utf-8").rstrip())
+
+            with open(fn, "r") as f:
+                out = f.read()
+                f.close()
+            log.debug(out)
+
+
+
+
+            if rp:
+                rp.umount() 
+            elif lvm:
+                lvm.umount() 
+                lvm.deactivate()
+            rp_td.cleanup()
 
         except:
             self.detach_lo()

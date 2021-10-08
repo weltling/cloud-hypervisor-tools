@@ -136,7 +136,7 @@ class Part():
 
         Part.mkfs(disk.lo, num, fs)
 
-        return Part({"num": num, "start": start, "end": end, "fs": fs, "flags": flags})
+        return Part({"num": num, "start": start, "end": end, "fs": fs, "flags": flags}, disk)
 
 
     @staticmethod

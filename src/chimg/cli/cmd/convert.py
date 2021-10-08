@@ -2,7 +2,7 @@
 import os
 import logging
 from chimg.disk import Disk
-from chimg.cli import comm, bcolors
+from chimg.cli import comm, bcolors, CliError
 
 log = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ def do_conv(args):
     if args.in_place:
 
         if not args.boot_part:
-            log.error("For the in-place conversion the boot partition number is required")
+            log.error("--boot-part is required")
             return 3
 
         dev_fmt = Disk.get_dev_fmt(src_path)
@@ -25,7 +25,7 @@ def do_conv(args):
             tgt_path = args.target
             dev = Disk.dev_fmt_cvt(src_path, dev_fmt, tgt_path, out_fmt="raw")
 
-        src = Disk((dev, dev_fmt))
+        src = Disk((dev, dev_fmt), True)
 
         # XXX For the time being it is still easier to resize image
         #     rather than going into business of resising partitions.
@@ -37,7 +37,16 @@ def do_conv(args):
             Disk.dev_resize(dev, sz)
             src = Disk((dev, dev_fmt))
 
-        src.convert_efi_in_place(int(args.boot_part))
+        if not args.root_part:
+            log.error("--root-part is required")
+            return 3
+
+        try:
+            root_part = int(args.root_part)
+        except:
+            root_part = args.root_part
+
+        src.convert_efi_in_place(int(args.boot_part), root_part)
 
     else:
         #src = Disk(src_path)
