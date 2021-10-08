@@ -19,7 +19,7 @@ def do_conv(args):
 
         dev_fmt = Disk.get_dev_fmt(src_path)
         if "raw" == dev_fmt:
-            tgt_path = os.path.splitext(src_path)[0] + "_copy.raw"
+            tgt_path = os.path.splitext(src_path)[0] + "_ch.raw"
             dev = Disk.dev_fmt_cvt(src_path, dev_fmt, tgt_path, out_fmt="raw")
         else:
             tgt_path = args.target
