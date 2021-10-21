@@ -23,6 +23,7 @@ class LVM():
         self.lv = None
         self.vg = None
         self.mnt_pt = None
+        self.vg_active = False
 
 
     def __del__(self):
@@ -84,6 +85,8 @@ class LVM():
 
 
     def activate(self):
+        if self.vg_active:
+            return
         if not self.vg:
             return
         cmd = ["sudo", "vgchange", "-ay", self.vg]
@@ -93,10 +96,11 @@ class LVM():
         if proc.returncode:
             raise LvmError(str(err, "utf-8").rstrip())
         log.debug(str(out, "utf-8").strip())
+        self.vg_active = True
 
         
     def deactivate(self):
-        if not self.vg:
+        if not self.vg_active:
             return
         cmd = ["sudo", "vgchange", "-an", self.vg]
         log.info(" ".join(cmd))
@@ -106,6 +110,7 @@ class LVM():
             raise LvmError(str(err, "utf-8").rstrip())
         log.debug(str(out, "utf-8").strip())
         self.vg = None
+        self.vg_active = False
 
 
     def mount(self,  mnt_pt, rw=False):
