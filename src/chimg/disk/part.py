@@ -157,7 +157,15 @@ class Part():
 
     @staticmethod
     def mkfs(disk_dev, num, fs):
-        cmd = ["sudo", "mkfs", "-t", fs, Part.make_part_dev_path(disk_dev, num)]
+        fs_type = fs
+        if "fat32" == fs:
+            fs_type = "fat"
+        cmd = ["sudo", "mkfs", "-t", fs_type]
+        # XXX Make this method accepting mkfs extra options
+        if "fat32" == fs:
+            cmd.append("-F")
+            cmd.append("32")
+        cmd.append(Part.make_part_dev_path(disk_dev, num))
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()

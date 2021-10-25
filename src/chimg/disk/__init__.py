@@ -283,12 +283,14 @@ class Disk():
             p1_start = p0_end + 1
             p1_end = bp.end
             p1_fs = bp.fs
+            # Enforce ext4 unconditionally, disregard what the original one was
+            # p1_fs = "ext4"
             p1_flags = bp.flags
 
             # XXX Do part remove/add business, the object is still inconsistent at/after this point
             self.part_del(bp.num)
             #p0 = self.part_new(p0_start, p0_end, "fat", ["type={}".format(0xef00)], p0_num)
-            p0 = self.part_new(p0_start, p0_end, "fat", ["type=ef"], p0_num)
+            p0 = self.part_new(p0_start, p0_end, p0_fs, ["type=ef"], p0_num)
             p1 = self.part_new(p1_start, p1_end, p1_fs, p1_flags)
 
             # Prepare boot and efi parts
@@ -394,13 +396,14 @@ class Disk():
 
             #"grub2-install;" \
             #"tree /boot;" \
+            #"efibootmgr -v;" \
             cmd = "if test -f /etc/resolv.conf; then mv /etc/resolv.conf /etc/resolv.conf~; fi;" \
                     "echo 'nameserver 192.168.178.1' > /etc/resolv.conf;" \
                     "if test -f /etc/yum.repos.d/cna.repo; then mv /etc/yum.repos.d/cna.repo /etc/yum.repos.d/cna.repo.off; fi;" \
                     "subscription-manager register --username user --password pass --auto-attach || true;" \
-                    "tree /boot;" \
-                    "yum install --disablerepo=* --enablerepo=rhel-8-for-x86_64-baseos-rpms -y grub2-pc grub2-efi-x64 efibootmgr dbxtool mokutil shim-x64;" \
+                    "yum install --disablerepo=* --enablerepo=rhel-8-for-x86_64-baseos-rpms -y grub2-pc grub2-efi-x64 efibootmgr dbxtool mokutil shim-x64 grubby;" \
                     "grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg;" \
+                    "rm -rf /boot/efi/NvVars;" \
                     "subscription-manager unregister || true;" \
                     "if test -f /etc/yum.repos.d/cna.repo.off; then mv /etc/yum.repos.d/cna.repo.off /etc/yum.repos.d/cna.repo; fi;" \
                     "rm /etc/resolv.conf;" \
@@ -415,6 +418,11 @@ class Disk():
             p1.umount()
             p1_td.cleanup()
 
+            # All but root part is unmounted
+            cc = ["sudo", "sync"]
+            proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = proc.communicate()
+
             # Tear down LVM.
             if rp:
                 rp.umount() 
@@ -422,9 +430,6 @@ class Disk():
                 lvm.umount() 
                 lvm.deactivate()
             rp_td.cleanup()
-
-
-            # Chroot, setup things and install grub, lets see.
 
         except:
             self.detach_lo()
@@ -448,18 +453,47 @@ class Disk():
                 log.debug(str(err, "utf-8").rstrip())
             log.debug(str(out, "utf-8").rstrip())
 
+        chroot_cmd_ok = True
         cc = ["sudo", "chroot", root,  "/bin/bash", "-c", cmd]
         log.info(" ".join(cc))
         proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
         if proc.returncode:
-            raise DiskError(str(err, "utf-8").rstrip())
+            chroot_cmd_ok = True
+            chroot_cmd_err = err
         log.debug(str(out, "utf-8").rstrip())
-        for mc in mnts:
-            c = ["sudo", "umount", "-f", mc[len(mc)-1]]
+
+        # Some additional mounts within the actually requested ones could be made
+        # automatically from within the rootfs. Try to unmount them all before.
+        cc = ["sudo", "mount"]
+        proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise DiskError(str(err, "utf-8").rstrip())
+        mns = []
+        for ln in str(out, "utf-8").strip().split("\n"):
+            t = ln.split(" ")
+            if t[2].startswith(root):
+                not_part = True
+                for p in self.part:
+                    if t[2] == self.part[p].mnt_pt:
+                        not_part = False
+                        break
+                if not_part:
+                    mns.append(t[2])
+        mns.sort(key=len, reverse=True)
+        for mc in mns:
+            c = ["sudo", "umount", mc]
             log.info(" ".join(c))
             proc = subprocess.Popen(c, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = proc.communicate()
             if proc.returncode:
                 log.debug(str(err, "utf-8").rstrip())
             log.debug(str(out, "utf-8").rstrip())
+
+        cc = ["sudo", "sync"]
+        proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        if not chroot_cmd_ok:
+            raise DiskError(str(chroot_cmd_err, "utf-8").rstrip())
+
