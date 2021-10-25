@@ -29,7 +29,7 @@ def main(argv = []):
     arg_parser_conv = arg_parser_subs.add_parser("convert", help="Convert disk image.",
                                                  parents=[arg_parser_common])
     arg_parser_conv.add_argument("-r", "--root-part", action="store",
-                                 help="Source root partition number.")
+                                 help="Source root partition as number or LV as shown by the info command.")
     arg_parser_conv.add_argument("-b", "--boot-part", action="store",
                                  help="Source boot partition number.")
     arg_parser_conv.add_argument("-l", "--lvm-vg", action="store",

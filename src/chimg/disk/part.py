@@ -121,9 +121,10 @@ class Part():
         # XXX handle more flags
         for f in flags:
             if f.startswith("type="):
-                t = int(parse("type={:d}", f)[0])
+                t = int(parse("type={:x}", f)[0])
                 cmd.append("-t")
-                cmd.append("{}:0x{:x}".format(num, t))
+                # See man sgdisk -L for two-byte code type definition
+                cmd.append("{}:0x{:x}".format(num, t*0x0100))
                 continue
 
         cmd.append(disk.lo)

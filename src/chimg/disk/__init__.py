@@ -253,32 +253,6 @@ class Disk():
         # XXX check if part exists and bail out cleanly
         # XXX check if there's enough space after the deletion, so it can be reused for two parts
         bp = self.part[boot_part]
-        lvm = None
-        rp = None
-        if isinstance(root_part, int):
-            rp = self.part[root_part]
-        elif isinstance(root_part, str):
-            # Must be on LVM
-            # XXX Pack LVM part search into a method
-            for p in self.part:
-                got_it = False
-                for k, v in self.part[p].__dict__.items():
-                    if "flags" == k and "lvm" in v:
-                #for k, v in disk.part[p].__dict__.items():
-                #    if "flags" == k and "lvm" in v:
-                #        lvm = LVM(Part.make_part_dev_path(self.lo, disk.part[p].num))
-                        lvm = LVM(Part.make_part_dev_path(self.lo, self.part[p].num))
-                        vg = lvm.scan_vg(3)
-                        lv = lvm.scan_lv(3)
-                        if root_part in lv:
-                            lvm.lo = "/dev/mapper/" + root_part
-                            lvm.activate()
-                            got_it = True
-                        break
-                if got_it:
-                    break
-        else:
-            raise DiskError("Can't interpret '{}' as root partition".format(root_part))
 
         self.attach_lo()
 
@@ -313,7 +287,8 @@ class Disk():
 
             # XXX Do part remove/add business, the object is still inconsistent at/after this point
             self.part_del(bp.num)
-            p0 = self.part_new(p0_start, p0_end, "fat", ["type={}".format(0xef00)], p0_num)
+            #p0 = self.part_new(p0_start, p0_end, "fat", ["type={}".format(0xef00)], p0_num)
+            p0 = self.part_new(p0_start, p0_end, "fat", ["type=ef"], p0_num)
             p1 = self.part_new(p1_start, p1_end, p1_fs, p1_flags)
 
             # Prepare boot and efi parts
@@ -347,14 +322,42 @@ class Disk():
             subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
             log.info(" ".join(cmd))
 
-
-            # Fix fstab
+            # Figure out root part
+            lvm = None
+            rp = None
             rp_td = tempfile.TemporaryDirectory()
-            if rp:
+            if isinstance(root_part, int):
+                rp = self.part[root_part]
                 rp.mount(self.lo, rp_td.name, True) 
-            elif lvm:
-                lvm.mount(rp_td.name, True) 
-
+            elif isinstance(root_part, str):
+                # Must be on LVM
+                # XXX Pack LVM part search into a method
+                for p in self.part:
+                    got_it = False
+                    for k, v in self.part[p].__dict__.items():
+                        if "flags" == k and "lvm" in v:
+                    #for k, v in disk.part[p].__dict__.items():
+                    #    if "flags" == k and "lvm" in v:
+                    #        lvm = LVM(Part.make_part_dev_path(self.lo, disk.part[p].num))
+                            lvm = LVM(Part.make_part_dev_path(self.lo, self.part[p].num))
+                            vg = lvm.scan_vg(3)
+                            lv = lvm.scan_lv(3)
+                            if root_part in lv:
+                                lvm.lo = root_part
+                                lvm.activate()
+                                lvm.mount(rp_td.name, True) 
+                                got_it = True
+                            break
+                    if got_it:
+                        break
+            else:
+                rp_td.cleanup()
+                raise DiskError("Can't interpret '{}' as root partition".format(root_part))
+            if not got_it:
+                rp_td.cleanup()
+                raise DiskError("Couldn't find LV '{}' in VG '{}'".format(root_part, lvm.vg))
+ 
+            # Fix fstab
             fn = os.path.join(rp_td.name, "etc", "fstab")
             with open(fn, "r") as f:
                 out = f.read()
@@ -381,8 +384,38 @@ class Disk():
             log.debug(out)
 
 
+            # Install GRUB from the distro
+            # XXX This is distro specific. RHEL in this case.
+            # XXX This is arch specific.
+            boot_mnt_pt = os.path.join(rp_td.name, "boot")
+            p1.mount(self.lo, boot_mnt_pt, True)
+            efi_mnt_pt = os.path.join(boot_mnt_pt, "efi")
+            p0.mount(self.lo, efi_mnt_pt, True)
 
+            #"grub2-install;" \
+            #"tree /boot;" \
+            cmd = "if test -f /etc/resolv.conf; then mv /etc/resolv.conf /etc/resolv.conf~; fi;" \
+                    "echo 'nameserver 192.168.178.1' > /etc/resolv.conf;" \
+                    "if test -f /etc/yum.repos.d/cna.repo; then mv /etc/yum.repos.d/cna.repo /etc/yum.repos.d/cna.repo.off; fi;" \
+                    "subscription-manager register --username user --password pass --auto-attach || true;" \
+                    "tree /boot;" \
+                    "yum install --disablerepo=* --enablerepo=rhel-8-for-x86_64-baseos-rpms -y grub2-pc grub2-efi-x64 efibootmgr dbxtool mokutil shim-x64;" \
+                    "grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg;" \
+                    "subscription-manager unregister || true;" \
+                    "if test -f /etc/yum.repos.d/cna.repo.off; then mv /etc/yum.repos.d/cna.repo.off /etc/yum.repos.d/cna.repo; fi;" \
+                    "rm /etc/resolv.conf;" \
+                    "if test -f /etc/resolv.conf~; then cp /etc/resolv.conf~ /etc/resolv.conf; fi;" \
+                    " 2>&1"
+            self.chroot(rp_td.name, cmd) 
 
+            # Tear down boot and efi part
+            p0.umount()
+            p0_td.cleanup()
+
+            p1.umount()
+            p1_td.cleanup()
+
+            # Tear down LVM.
             if rp:
                 rp.umount() 
             elif lvm:
@@ -390,8 +423,43 @@ class Disk():
                 lvm.deactivate()
             rp_td.cleanup()
 
+
+            # Chroot, setup things and install grub, lets see.
+
         except:
             self.detach_lo()
             raise
 
         self.detach_lo()
+
+    def chroot(self, root, cmd, args=[]):
+        mnts = [
+                ["sudo", "mount", "--types", "proc", "/proc", os.path.join(root, "proc")],
+                ["sudo", "mount", "--rbind", "/sys", os.path.join(root, "sys")],
+                ["sudo", "mount", "--make-rslave", os.path.join(root, "sys")],
+                ["sudo", "mount", "--rbind", "/dev", os.path.join(root, "dev")],
+                ["sudo", "mount", "--make-rslave", os.path.join(root, "dev")],
+                ]
+        for mc in mnts:
+            log.info(" ".join(mc))
+            proc = subprocess.Popen(mc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = proc.communicate()
+            if proc.returncode:
+                log.debug(str(err, "utf-8").rstrip())
+            log.debug(str(out, "utf-8").rstrip())
+
+        cc = ["sudo", "chroot", root,  "/bin/bash", "-c", cmd]
+        log.info(" ".join(cc))
+        proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise DiskError(str(err, "utf-8").rstrip())
+        log.debug(str(out, "utf-8").rstrip())
+        for mc in mnts:
+            c = ["sudo", "umount", "-f", mc[len(mc)-1]]
+            log.info(" ".join(c))
+            proc = subprocess.Popen(c, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = proc.communicate()
+            if proc.returncode:
+                log.debug(str(err, "utf-8").rstrip())
+            log.debug(str(out, "utf-8").rstrip())

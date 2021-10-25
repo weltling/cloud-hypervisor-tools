@@ -13,7 +13,8 @@ class LvmError(Exception):
     pass
 
 
-# XXX Split into VG and LV classes to handle things correctly
+# XXX Split into VG and LV classes to handle things correctly.
+#     LVM class would still stay as a management instance.
 
 class LVM():
 
@@ -32,6 +33,7 @@ class LVM():
         self.deactivate()
 
 
+    # XXX Support multiple VG
     def scan_vg(self, tmo=1):
         k = 0
         while k < tmo:
@@ -55,10 +57,11 @@ class LVM():
 
         return None
 
+    # XXX Support multiple VG
     def scan_lv(self, tmo=1):
         k = 0
         while k < tmo:
-            cmd = ["sudo", "lvs", "--devices", self.part_lo, "--separator", ":", "--noheadings"]
+            cmd = ["sudo", "lvdisplay", "--devices", self.part_lo, "--colon"]
             log.info(" ".join(cmd))
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = proc.communicate()
@@ -71,9 +74,9 @@ class LVM():
                 self.lv = []
                 outl = str(out, "utf-8").split("\n")
                 for l in outl:
-                    res = parse("{}:{}:{:>}", l)
+                    res = parse("{}:{:>}", l)
                     if res:
-                        lv = "{}-{}".format(res[1].strip(), res[0].strip())
+                        lv = "{}".format(res[0].strip())
                         self.lv.append(lv)
                 return self.lv
 
