@@ -246,6 +246,14 @@ class Disk():
         return self.part[num]
 
 
+    @staticmethod
+    def sync():
+        # All but root part is unmounted
+        cc = ["sudo", "sync"]
+        proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+
+
     # Takes only the boot part
     def convert_efi_in_place(self, boot_part, root_part):
         # XXX Check if the conversion is really needed. Fe disk is not gpt, no efi part exists, etc. 
@@ -419,9 +427,7 @@ class Disk():
             p1_td.cleanup()
 
             # All but root part is unmounted
-            cc = ["sudo", "sync"]
-            proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out, err = proc.communicate()
+            Disk.sync()
 
             # Tear down LVM.
             if rp:
@@ -473,7 +479,7 @@ class Disk():
         mns = []
         for ln in str(out, "utf-8").strip().split("\n"):
             t = ln.split(" ")
-            if t[2].startswith(root):
+            if t[2].startswith(root) and t[2] != root:
                 not_part = True
                 for p in self.part:
                     if t[2] == self.part[p].mnt_pt:
@@ -490,6 +496,7 @@ class Disk():
             if proc.returncode:
                 log.debug(str(err, "utf-8").rstrip())
             log.debug(str(out, "utf-8").rstrip())
+            Disk.sync()
 
         cc = ["sudo", "sync"]
         proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
