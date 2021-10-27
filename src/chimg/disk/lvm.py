@@ -105,10 +105,26 @@ class LVM():
     def deactivate(self):
         if not self.vg_active:
             return
-        cmd = ["sudo", "vgchange", "-an", self.vg]
+
+        # Check if something is still accessing any LV and kill it
+        try:
+            cmd = "sudo grep -e '{}' /proc/*/mounts".format(self.vg)
+            log.info(cmd)
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            out, err = proc.communicate()
+            for ln in str(out, "utf-8").strip().split("\n"):
+                pid = parse("/proc/{}/{:>}", ln)[0]
+                cc = ["sudo", "kill", "-15", pid]
+                log.info(" ".join(cc))
+                subprocess.run(cc)
+        except:
+            pass
+
+        cmd = ["sudo", "vgchange", "-an", "-f", self.vg]
         log.info(" ".join(cmd))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
+        # There might be race conditions during the VG deactivation.
         if proc.returncode:
             raise LvmError(str(err, "utf-8").rstrip())
         log.debug(str(out, "utf-8").strip())

@@ -405,19 +405,27 @@ class Disk():
             #"grub2-install;" \
             #"tree /boot;" \
             #"efibootmgr -v;" \
-            cmd = "if test -f /etc/resolv.conf; then mv /etc/resolv.conf /etc/resolv.conf~; fi;" \
-                    "echo 'nameserver 192.168.178.1' > /etc/resolv.conf;" \
-                    "if test -f /etc/yum.repos.d/cna.repo; then mv /etc/yum.repos.d/cna.repo /etc/yum.repos.d/cna.repo.off; fi;" \
-                    "subscription-manager register --username user --password pass --auto-attach || true;" \
-                    "yum install --disablerepo=* --enablerepo=rhel-8-for-x86_64-baseos-rpms -y grub2-pc grub2-efi-x64 efibootmgr dbxtool mokutil shim-x64 grubby;" \
-                    "grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg;" \
-                    "rm -rf /boot/efi/NvVars;" \
-                    "subscription-manager unregister || true;" \
-                    "if test -f /etc/yum.repos.d/cna.repo.off; then mv /etc/yum.repos.d/cna.repo.off /etc/yum.repos.d/cna.repo; fi;" \
-                    "rm /etc/resolv.conf;" \
-                    "if test -f /etc/resolv.conf~; then cp /etc/resolv.conf~ /etc/resolv.conf; fi;" \
-                    " 2>&1"
-            self.chroot(rp_td.name, cmd) 
+            cmds = ["if test -f /etc/resolv.conf; then mv /etc/resolv.conf /etc/resolv.conf~; fi",
+                    "echo 'nameserver 192.168.178.1' > /etc/resolv.conf",
+                    "if test -f /etc/yum.repos.d/cna.repo; then mv /etc/yum.repos.d/cna.repo /etc/yum.repos.d/cna.repo.off; fi",
+                    # Hack, put your subscription data below
+                    "subscription-manager register --username user --password pass --auto-attach || true",
+                    "yum install --disablerepo=* --enablerepo=rhel-8-for-x86_64-baseos-rpms -y grub2-pc grub2-efi-x64 efibootmgr dbxtool mokutil shim-x64 grubby",
+                    "grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg",
+                    "rm -rf /boot/efi/NvVars;",
+                    "subscription-manager unregister || true",
+                    "if test -f /etc/yum.repos.d/cna.repo.off; then mv /etc/yum.repos.d/cna.repo.off /etc/yum.repos.d/cna.repo; fi",
+                    "rm /etc/resolv.conf",
+                    "if test -f /etc/resolv.conf~; then cp /etc/resolv.conf~ /etc/resolv.conf; fi",
+                    ]
+
+            self.chroot_init(rp_td.name)
+            for cmd in cmds:
+                try:
+                    self.chroot(rp_td.name, cmd)
+                except DiskError as e:
+                    log.debug(str(e))
+            self.chroot_teardown(rp_td.name)
 
             # Tear down boot and efi part
             p0.umount()
@@ -432,8 +440,10 @@ class Disk():
             # Tear down LVM.
             if rp:
                 rp.umount() 
+                Disk.sync()
             elif lvm:
                 lvm.umount() 
+                Disk.sync()
                 lvm.deactivate()
             rp_td.cleanup()
 
@@ -443,14 +453,20 @@ class Disk():
 
         self.detach_lo()
 
-    def chroot(self, root, cmd, args=[]):
+    def chroot_init(self, root):
+        #mnts = [
+        #        ["sudo", "mount", "--types", "proc", "/proc", os.path.join(root, "proc")],
+        #        ["sudo", "mount", "--rbind", "/sys", os.path.join(root, "sys")],
+        #        ["sudo", "mount", "--make-rslave", os.path.join(root, "sys")],
+        #        ["sudo", "mount", "--rbind", "/dev", os.path.join(root, "dev")],
+        #        ["sudo", "mount", "--make-rslave", os.path.join(root, "dev")],
+        #        ]
         mnts = [
-                ["sudo", "mount", "--types", "proc", "/proc", os.path.join(root, "proc")],
-                ["sudo", "mount", "--rbind", "/sys", os.path.join(root, "sys")],
-                ["sudo", "mount", "--make-rslave", os.path.join(root, "sys")],
-                ["sudo", "mount", "--rbind", "/dev", os.path.join(root, "dev")],
-                ["sudo", "mount", "--make-rslave", os.path.join(root, "dev")],
+                ["sudo", "mount", "--bind", "/dev", os.path.join(root, "dev")],
+                ["sudo", "mount", "--bind", "/sys", os.path.join(root, "sys")],
+                ["sudo", "mount", "--bind", "/proc", os.path.join(root, "proc")],
                 ]
+
         for mc in mnts:
             log.info(" ".join(mc))
             proc = subprocess.Popen(mc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -459,16 +475,7 @@ class Disk():
                 log.debug(str(err, "utf-8").rstrip())
             log.debug(str(out, "utf-8").rstrip())
 
-        chroot_cmd_ok = True
-        cc = ["sudo", "chroot", root,  "/bin/bash", "-c", cmd]
-        log.info(" ".join(cc))
-        proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err = proc.communicate()
-        if proc.returncode:
-            chroot_cmd_ok = True
-            chroot_cmd_err = err
-        log.debug(str(out, "utf-8").rstrip())
-
+    def chroot_teardown(self, root):
         # Some additional mounts within the actually requested ones could be made
         # automatically from within the rootfs. Try to unmount them all before.
         cc = ["sudo", "mount"]
@@ -501,6 +508,16 @@ class Disk():
         cc = ["sudo", "sync"]
         proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-        if not chroot_cmd_ok:
-            raise DiskError(str(chroot_cmd_err, "utf-8").rstrip())
+
+    def chroot(self, root, cmd, args=[], info=True):
+
+        cc = ["sudo", "chroot", root,  "/bin/bash", "-c", cmd]
+        if info:
+            log.info(" ".join(cc))
+        proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
+        if proc.returncode:
+            raise DiskError(str(err, "utf-8").rstrip())
+        if info:
+            log.debug(str(out, "utf-8").rstrip())
 
