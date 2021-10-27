@@ -422,7 +422,10 @@ class Disk():
             self.chroot_init(rp_td.name)
             for cmd in cmds:
                 try:
-                    self.chroot(rp_td.name, cmd)
+                    info=0
+                    if cmd.startswith("subscription-manager"):
+                        info=2
+                    self.chroot(rp_td.name, cmd, info=info)
                 except DiskError as e:
                     log.debug(str(e))
             self.chroot_teardown(rp_td.name)
@@ -509,15 +512,19 @@ class Disk():
         proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-    def chroot(self, root, cmd, args=[], info=True):
+    def chroot(self, root, cmd, args=[], info=0):
 
         cc = ["sudo", "chroot", root,  "/bin/bash", "-c", cmd]
-        if info:
+        # Zero imply print the whole cmd
+        if not info:
             log.info(" ".join(cc))
+        else:
+            # Only show that many segments
+            log.info("{} {} ...".format(" ".join(cc[:5]), " ".join(cmd.split(" ")[:info])))
         proc = subprocess.Popen(cc, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
         if proc.returncode:
             raise DiskError(str(err, "utf-8").rstrip())
-        if info:
+        if not info:
             log.debug(str(out, "utf-8").rstrip())
 
