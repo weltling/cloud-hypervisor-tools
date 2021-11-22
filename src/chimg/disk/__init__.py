@@ -416,7 +416,8 @@ class Disk():
             cmds.append("yum install --disablerepo=* --enablerepo=rhel-8-for-x86_64-baseos-rpms -y grub2-pc grub2-efi-x64 efibootmgr dbxtool mokutil shim-x64 grubby")
             cmds.append("grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg")
             cmds.append("rm -rf /boot/efi/NvVars;")
-            cmds.append("subscription-manager unregister || true")
+            if subscription_user and subscription_pass:
+                cmds.append("subscription-manager unregister || true")
             cmds.append("if test -f /etc/yum.repos.d/cna.repo.off; then mv /etc/yum.repos.d/cna.repo.off /etc/yum.repos.d/cna.repo; fi")
             if dns_server:
                 cmds.append("rm /etc/resolv.conf")
