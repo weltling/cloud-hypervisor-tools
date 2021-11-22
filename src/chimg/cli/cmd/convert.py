@@ -46,7 +46,7 @@ def do_conv(args):
         except:
             root_part = args.root_part
 
-        src.convert_efi_in_place(int(args.boot_part), root_part)
+        src.convert_efi_in_place(int(args.boot_part), root_part, subscription_user = args.subscription_user, subscription_pass = args.subscription_pass, dns_server = args.dns_server)
 
     else:
         #src = Disk(src_path)

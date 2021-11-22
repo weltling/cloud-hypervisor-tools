@@ -255,7 +255,7 @@ class Disk():
 
 
     # Takes only the boot part
-    def convert_efi_in_place(self, boot_part, root_part):
+    def convert_efi_in_place(self, boot_part, root_part, subscription_user=None, subscription_pass=None, dns_server=None):
         # XXX Check if the conversion is really needed. Fe disk is not gpt, no efi part exists, etc. 
 
         # XXX check if part exists and bail out cleanly
@@ -405,19 +405,21 @@ class Disk():
             #"grub2-install;" \
             #"tree /boot;" \
             #"efibootmgr -v;" \
-            cmds = ["if test -f /etc/resolv.conf; then mv /etc/resolv.conf /etc/resolv.conf~; fi",
-                    "echo 'nameserver 192.168.178.1' > /etc/resolv.conf",
-                    "if test -f /etc/yum.repos.d/cna.repo; then mv /etc/yum.repos.d/cna.repo /etc/yum.repos.d/cna.repo.off; fi",
-                    # Hack, put your subscription data below
-                    "subscription-manager register --username user --password pass --auto-attach || true",
-                    "yum install --disablerepo=* --enablerepo=rhel-8-for-x86_64-baseos-rpms -y grub2-pc grub2-efi-x64 efibootmgr dbxtool mokutil shim-x64 grubby",
-                    "grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg",
-                    "rm -rf /boot/efi/NvVars;",
-                    "subscription-manager unregister || true",
-                    "if test -f /etc/yum.repos.d/cna.repo.off; then mv /etc/yum.repos.d/cna.repo.off /etc/yum.repos.d/cna.repo; fi",
-                    "rm /etc/resolv.conf",
-                    "if test -f /etc/resolv.conf~; then cp /etc/resolv.conf~ /etc/resolv.conf; fi",
-                    ]
+            cmds = []
+            cmds.append("if test -f /etc/resolv.conf; then mv /etc/resolv.conf /etc/resolv.conf~; fi")
+            if dns_server:
+                cmds.append("echo 'nameserver {}' > /etc/resolv.conf".format(dns_server))
+            cmds.append("if test -f /etc/yum.repos.d/cna.repo; then mv /etc/yum.repos.d/cna.repo /etc/yum.repos.d/cna.repo.off; fi")
+            if subscription_user and subscription_pass:
+                cmds.append("subscription-manager register --username {} --password {} --auto-attach || true".format(subscription_user, subscription_pass))
+            # XXX Put the package manager into a separate class depending on distro.
+            cmds.append("yum install --disablerepo=* --enablerepo=rhel-8-for-x86_64-baseos-rpms -y grub2-pc grub2-efi-x64 efibootmgr dbxtool mokutil shim-x64 grubby")
+            cmds.append("grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg")
+            cmds.append("rm -rf /boot/efi/NvVars;")
+            cmds.append("subscription-manager unregister || true")
+            cmds.append("if test -f /etc/yum.repos.d/cna.repo.off; then mv /etc/yum.repos.d/cna.repo.off /etc/yum.repos.d/cna.repo; fi")
+            cmds.append("rm /etc/resolv.conf")
+            cmds.append("if test -f /etc/resolv.conf~; then cp /etc/resolv.conf~ /etc/resolv.conf; fi")
 
             self.chroot_init(rp_td.name)
             for cmd in cmds:

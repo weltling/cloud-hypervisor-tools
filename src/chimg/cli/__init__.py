@@ -36,6 +36,12 @@ def main(argv = []):
                                  help="Source LVM VG name.")
     arg_parser_conv.add_argument("-i", "--in-place", action="store_true",
                                  help="Copy the source image and modify it in-place.")
+    arg_parser_conv.add_argument("--subscription-user", action="store",
+                                 help="Username to use with the subscription. RHEL only right now.")
+    arg_parser_conv.add_argument("--subscription-pass", action=Password, nargs="?",
+                                 help="Password to use with the subscription. RHEL only right now.")
+    arg_parser_conv.add_argument("--dns-server", action="store",
+                                 help="DNS server to be used within the chrooted image environment. Required if packages are to be installed from an official repository.")
     arg_parser_conv.add_argument("source", nargs=1)
     arg_parser_conv.add_argument("target", nargs="?")
     # Read passed arguments.
