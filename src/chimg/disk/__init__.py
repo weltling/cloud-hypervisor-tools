@@ -406,8 +406,8 @@ class Disk():
             #"tree /boot;" \
             #"efibootmgr -v;" \
             cmds = []
-            cmds.append("if test -f /etc/resolv.conf; then mv /etc/resolv.conf /etc/resolv.conf~; fi")
             if dns_server:
+                cmds.append("if test -f /etc/resolv.conf; then mv /etc/resolv.conf /etc/resolv.conf~; fi")
                 cmds.append("echo 'nameserver {}' > /etc/resolv.conf".format(dns_server))
             cmds.append("if test -f /etc/yum.repos.d/cna.repo; then mv /etc/yum.repos.d/cna.repo /etc/yum.repos.d/cna.repo.off; fi")
             if subscription_user and subscription_pass:
@@ -418,8 +418,9 @@ class Disk():
             cmds.append("rm -rf /boot/efi/NvVars;")
             cmds.append("subscription-manager unregister || true")
             cmds.append("if test -f /etc/yum.repos.d/cna.repo.off; then mv /etc/yum.repos.d/cna.repo.off /etc/yum.repos.d/cna.repo; fi")
-            cmds.append("rm /etc/resolv.conf")
-            cmds.append("if test -f /etc/resolv.conf~; then cp /etc/resolv.conf~ /etc/resolv.conf; fi")
+            if dns_server:
+                cmds.append("rm /etc/resolv.conf")
+                cmds.append("if test -f /etc/resolv.conf~; then cp /etc/resolv.conf~ /etc/resolv.conf; fi")
 
             self.chroot_init(rp_td.name)
             for cmd in cmds:

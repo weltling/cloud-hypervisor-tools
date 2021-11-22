@@ -40,6 +40,7 @@ def main(argv = []):
                                  help="Username to use with the subscription. RHEL only right now.")
     arg_parser_conv.add_argument("--subscription-pass", action=Password, nargs="?",
                                  help="Password to use with the subscription. RHEL only right now.")
+    # TODO Determine the network parameters by reading the host configuration and use it automatically if no arg passed.
     arg_parser_conv.add_argument("--dns-server", action="store",
                                  help="DNS server to be used within the chrooted image environment. Required if packages are to be installed from an official repository.")
     arg_parser_conv.add_argument("source", nargs=1)
